@@ -1,0 +1,25 @@
+name: Mock task
+description: some description
+processor: >
+  /Users/liuchang/mambaforge/envs/avalon/bin/python process.py
+
+hosts:
+  - hostname: ism-gpu-a100 # hello of remote server. It must be a hello in the ssh .config file.
+    working_root: /home/liuchang/avalon_calculation
+    submit:
+      scheduler: Slurm
+      script: |
+        #!/bin/bash
+        #
+        #SBATCH --job-name=test_vasp
+        #SBATCH --output=vasp.out.%j
+        #SBATCH --error=vasp.err.%j
+        #SBATCH --ntasks=16
+        # #SBATCH --nodes=1
+
+        source /etc/bashrc
+        module load {vasp}/6.1.2
+
+        # fist step
+        cd step_1
+        mpirun -np $SLURM_NTASKS vasp_std
