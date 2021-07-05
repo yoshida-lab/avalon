@@ -15,3 +15,10 @@
  */
 
 package executor
+
+type Executor interface {
+	SyncFileRemote(src, dest string, fromLocal bool, opts *CopyOptions) error
+	SyncFileLocal(src, dest string, opts *CopyOptions) error
+	ExecRemote(commands *[]string, stepForward func([]string, error))
+	ExecLocal(currentDir string, commands *[]string, stepForward func(error))
+}
