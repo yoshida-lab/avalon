@@ -16,6 +16,8 @@
 
 package executor
 
+import "io/fs"
+
 type CopyOptions struct {
 	// Create new directory when not existing.
 	CreateDir bool
@@ -33,17 +35,17 @@ type CopyOptions struct {
 	// Warning: Work only for copy operations!
 	Depth uint64
 	// file permissions
-	FileMode uint32
+	FileMode fs.FileMode
 }
 
-func DefaultCopyOpts() CopyOptions {
-	return CopyOptions{
+func DefaultCopyOpts() *CopyOptions {
+	return &CopyOptions{
 		CreateDir:   true,
 		Overwrite:   true,
 		SkipExist:   true,
 		BufferSize:  64000, // 64kb
 		MoveContent: false,
 		Depth:       0,
-		FileMode:    0o644,
+		FileMode:    0644,
 	}
 }

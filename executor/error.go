@@ -19,8 +19,8 @@ package executor
 import "fmt"
 
 type Error struct {
-	ErrCode ErrorCode
-	Err     error
+	errCode ErrorCode
+	err     error
 }
 
 type ErrorCode uint8
@@ -38,30 +38,38 @@ const (
 )
 
 func (e *Error) String() string {
-	switch e.ErrCode {
+	switch e.errCode {
 	case IOError:
-		return fmt.Sprintf("IOError (%d): %v", IOError, e.Err)
+		return fmt.Sprintf("IOError (%d): %v", IOError, e.err)
 	case CmdExecutionError:
-		return fmt.Sprintf("CmdExecutionError (%d): %v", CmdExecutionError, e.Err)
+		return fmt.Sprintf("CmdExecutionError (%d): %v", CmdExecutionError, e.err)
 	case LoggingError:
-		return fmt.Sprintf("LoggingError (%d): %v", LoggingError, e.Err)
+		return fmt.Sprintf("LoggingError (%d): %v", LoggingError, e.err)
 	case JoinError:
-		return fmt.Sprintf("JoinError (%d): %v", JoinError, e.Err)
+		return fmt.Sprintf("JoinError (%d): %v", JoinError, e.err)
 	case LocalFileError:
-		return fmt.Sprintf("LocalFileError (%d): %v", LocalFileError, e.Err)
+		return fmt.Sprintf("LocalFileError (%d): %v", LocalFileError, e.err)
 	case RemoteAddrError:
-		return fmt.Sprintf("RemoteAddrError (%d): %v", RemoteAddrError, e.Err)
+		return fmt.Sprintf("RemoteAddrError (%d): %v", RemoteAddrError, e.err)
 	case SSHConnectError:
-		return fmt.Sprintf("SSHConnectError (%d): %v", SSHConnectError, e.Err)
+		return fmt.Sprintf("SSHConnectError (%d): %v", SSHConnectError, e.err)
 	case AuthenticationError:
-		return fmt.Sprintf("AuthenticationError (%d): %v", AuthenticationError, e.Err)
+		return fmt.Sprintf("AuthenticationError (%d): %v", AuthenticationError, e.err)
 	case OtherError:
-		return fmt.Sprintf("OtherError (%d): %v", OtherError, e.Err)
+		return fmt.Sprintf("OtherError (%d): %v", OtherError, e.err)
 	default:
-		return fmt.Sprintf("UNKNOWN (%d): %v", e.ErrCode, e.Err)
+		return fmt.Sprintf("UNKNOWN (%d): %v", e.errCode, e.err)
 	}
 }
 
 func (e *Error) Error() string {
 	return e.String()
+}
+
+func (e *Error) Type() ErrorCode {
+	return e.errCode
+}
+
+func (e *Error) Message() string {
+	return fmt.Sprintf("%+v", e.err)
 }

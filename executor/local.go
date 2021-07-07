@@ -18,6 +18,8 @@ package executor
 
 import (
 	"fmt"
+	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -27,8 +29,88 @@ import (
 
 type LocalExecutor struct{}
 
-func (l *LocalExecutor) SyncFileLocal(src, dest string, opts *CopyOptions) error {
-	panic("implement me")
+func copyOrMove(src, dest string, perm fs.FileMode, move bool) (err error) {
+	if move {
+		if err = os.Rename(src, dest); err != nil {
+			return
+		}
+		return os.Chmod(dest, perm)
+
+	}
+
+	sf, err := os.Open(src)
+	if err != nil {
+		return
+	}
+	defer func(sf *os.File) {
+		err = sf.Close()
+	}(sf)
+
+	df, err := os.OpenFile(dest, os.O_WRONLY|os.O_CREATE, perm)
+	if err != nil {
+		return
+	}
+	defer func(df *os.File) {
+		err = df.Close()
+	}(df)
+
+	_, err = io.Copy(df, sf)
+	return
+}
+
+func syncOne(src, dest string, opts *CopyOptions) (err error) {
+	// convert paths to shortest
+	src, err = filepath.Abs(src)
+	if err != nil {
+		return
+	}
+	dest, err = filepath.Abs(dest)
+	if err != nil {
+		return
+	}
+
+	// create dest dirs
+	// this will create parents if not exist
+	if err = os.MkdirAll(dest, 0755); err != nil {
+		return
+	}
+
+	// check src file then apply copy or move base on the "opts"
+	info, err := os.Stat(src)
+	if os.IsNotExist(err) {
+		return
+	}
+	if info.IsDir() {
+		err = filepath.WalkDir(src, func(path string, info fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			rel, err := filepath.Rel(src, path)
+			if info.IsDir() {
+				if err != nil {
+					return err
+				}
+				if err = os.MkdirAll(filepath.Join(dest, rel), 0755); err != nil {
+					return err
+				}
+			}
+			return copyOrMove(path, filepath.Join(dest, rel), opts.FileMode, opts.MoveContent)
+		})
+	} else {
+		err = copyOrMove(src, filepath.Join(dest, filepath.Base(src)), opts.FileMode, opts.MoveContent)
+	}
+	return
+}
+
+func (l *LocalExecutor) SyncFileLocal(srcDest map[string]string, currentDir string, opts *CopyOptions) (err error) {
+	err = os.Chdir(currentDir)
+	if err != nil {
+		return
+	}
+	for src, dest := range srcDest {
+		err = &Error{IOError, syncOne(src, dest, opts)}
+	}
+	return
 }
 
 func (l *LocalExecutor) ExecLocal(currentDir string, commands *[]string, fn func(error)) {
@@ -41,10 +123,10 @@ func (l *LocalExecutor) ExecLocal(currentDir string, commands *[]string, fn func
 	}()
 
 	logPath := filepath.Join(currentDir, "logs")
-	// make logs dir if not exist with perm set to 0777
+	// make logs dir if not exist with perm set to 0755
 	// the umask will take away the unwanted permissions,
 	// leaving you with the right permissions.
-	if err := os.MkdirAll(logPath, 0777); err != nil {
+	if err := os.MkdirAll(logPath, 0755); err != nil {
 		fn(&Error{IOError, err})
 		return
 	}

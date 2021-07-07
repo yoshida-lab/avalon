@@ -115,8 +115,8 @@ func TestError_String(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			e := &Error{
-				ErrCode: tt.fields.ErrCode,
-				Err:     tt.fields.Err,
+				errCode: tt.fields.ErrCode,
+				err:     tt.fields.Err,
 			}
 			if got := e.String(); got != tt.want {
 				t.Errorf("String() = %v, want %v", got, tt.want)
