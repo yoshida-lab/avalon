@@ -27,7 +27,19 @@ import (
 	"time"
 )
 
-type LocalExecutor struct{}
+type localExecutor struct{}
+
+func NewLocalExecutor() *localExecutor {
+	return &localExecutor{}
+}
+
+func (l *localExecutor) SyncFileRemote(map[string]string, string, bool, *CopyOptions) (err error) {
+	panic("Local executor cannot be used to transform files to remote")
+}
+
+func (l *localExecutor) ExecRemote(*[]string, func([]string, error)) {
+	panic("Local executor cannot be used to execute commands om remote")
+}
 
 func copyOrMove(src, dest string, perm fs.FileMode, move bool) (err error) {
 	if move {
@@ -102,7 +114,7 @@ func syncOne(src, dest string, opts *CopyOptions) (err error) {
 	return
 }
 
-func (l *LocalExecutor) SyncFileLocal(srcDest map[string]string, currentDir string, opts *CopyOptions) (err error) {
+func (l *localExecutor) SyncFileLocal(srcDest map[string]string, currentDir string, opts *CopyOptions) (err error) {
 	err = os.Chdir(currentDir)
 	if err != nil {
 		return
@@ -113,7 +125,7 @@ func (l *LocalExecutor) SyncFileLocal(srcDest map[string]string, currentDir stri
 	return
 }
 
-func (l *LocalExecutor) ExecLocal(currentDir string, commands *[]string, fn func(error)) {
+func (l *localExecutor) ExecLocal(currentDir string, commands *[]string, fn func(error)) {
 	var fileHandle []*os.File
 	// close out files
 	defer func() {

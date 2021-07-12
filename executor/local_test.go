@@ -63,7 +63,7 @@ func TestLocalExecutor_ExecLocal(t *testing.T) {
 					}
 				}
 			}()
-			l := &LocalExecutor{}
+			l := NewLocalExecutor()
 			l.ExecLocal(tt.args.currentDir, tt.args.commands, tt.args.fn)
 		})
 	}

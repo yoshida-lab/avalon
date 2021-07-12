@@ -22,8 +22,3 @@ type Operation interface {
 	ExecRemote(commands *[]string, stepForward func([]string, error))
 	ExecLocal(currentDir string, commands *[]string, stepForward func(error))
 }
-
-type SSHExecutor struct {
-	LocalExecutor
-	RemoteExecutor
-}

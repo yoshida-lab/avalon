@@ -16,12 +16,19 @@
 
 package executor
 
-type RemoteExecutor struct{}
+type sshExecutor struct {
+	localExecutor
+}
 
-func (RemoteExecutor) SyncFileRemote(srcDest map[string]string, currentDir string, fromLocal bool, opts *CopyOptions) (err error) {
+func NewSSHExecutor() *sshExecutor {
+	return &sshExecutor{localExecutor: localExecutor{}}
+}
+
+func (sshExecutor) SyncFileRemote(srcDest map[string]string, currentDir string, fromLocal bool, opts *CopyOptions) (err error) {
 	panic("implement me")
 }
 
-func (RemoteExecutor) ExecRemote(commands *[]string, stepForward func([]string, error)) {
+func (sshExecutor) ExecRemote(commands *[]string, stepForward func([]string, error)) {
+	
 	panic("implement me")
 }
