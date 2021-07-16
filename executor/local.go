@@ -17,6 +17,7 @@
 package executor
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"io/fs"
@@ -24,8 +25,11 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 )
+
+const msgBufferSize = 1024
 
 type localExecutor struct{}
 
@@ -37,7 +41,7 @@ func (l *localExecutor) SyncFileRemote(map[string]string, string, bool, *CopyOpt
 	panic("Local executor cannot be used to transform files to remote")
 }
 
-func (l *localExecutor) ExecRemote(*[]string, func([]string, error)) {
+func (l *localExecutor) ExecRemote(currentDir string, commands *[]string) (stdOut <-chan string, stdErr <-chan string, err <-chan error) {
 	panic("Local executor cannot be used to execute commands om remote")
 }
 
@@ -125,60 +129,67 @@ func (l *localExecutor) SyncFileLocal(srcDest map[string]string, currentDir stri
 	return
 }
 
-func (l *localExecutor) ExecLocal(currentDir string, commands *[]string, fn func(error)) {
-	var fileHandle []*os.File
-	// close out files
-	defer func() {
-		for _, f := range fileHandle {
-			_ = f.Close()
+func (l *localExecutor) ExecLocal(currentDir string, commands *[]string) (<-chan string, <-chan string, <-chan error) {
+	stdOutChan := make(chan string)
+	stdErrChan := make(chan string)
+	errChan := make(chan error)
+
+	go func() {
+		defer close(stdErrChan)
+		defer close(stdOutChan)
+		defer close(errChan)
+
+		for _, cmd := range *commands {
+
+			cmdAndArgs := strings.Fields(cmd)
+			_exec := exec.Command(cmdAndArgs[0], cmdAndArgs[1:]...)
+			_exec.Dir = currentDir
+
+			stdout, err := _exec.StdoutPipe()
+			if err != nil {
+				errChan <- &Error{CmdExecutionError, err}
+			}
+			stderr, err := _exec.StderrPipe()
+			if err != nil {
+				errChan <- &Error{CmdExecutionError, err}
+			}
+
+			// exec command
+			if err = _exec.Start(); err != nil {
+				errChan <- &Error{CmdExecutionError, err}
+			}
+
+			var resWg sync.WaitGroup
+			resWg.Add(2)
+
+			nowStr := time.Now().Format("2006-01-02-15:04:05")
+			stdOutChan <- fmt.Sprintf("%v (%v):", cmd, nowStr)
+			go func() {
+				stdoutScanner := bufio.NewScanner(stdout)
+				for stdoutScanner.Scan() {
+					stdOutChan <- stdoutScanner.Text()
+				}
+				stdOutChan <- " "
+				resWg.Done()
+			}()
+
+			stdErrChan <- fmt.Sprintf("%v (%v):", cmd, nowStr)
+			go func() {
+				stderrScanner := bufio.NewScanner(stderr)
+				for stderrScanner.Scan() {
+					stdErrChan <- stderrScanner.Text()
+				}
+				stdErrChan <- " "
+				resWg.Done()
+			}()
+
+			// wait until done
+			if err = _exec.Wait(); err != nil {
+				errChan <- &Error{CmdExecutionError, err}
+			}
+			resWg.Wait()
 		}
 	}()
 
-	logPath := filepath.Join(currentDir, "logs")
-	// make logs dir if not exist with perm set to 0755
-	// the umask will take away the unwanted permissions,
-	// leaving you with the right permissions.
-	if err := os.MkdirAll(logPath, 0755); err != nil {
-		fn(&Error{IOError, err})
-		return
-	}
-
-	nowStr := time.Now().Format("2006-01-02-15:04:05")
-	for i, cmd := range *commands {
-		count := i + 1
-		stdoutFile := filepath.Join(logPath, fmt.Sprintf("%v.%v.out", nowStr, count))
-		stderrFile := filepath.Join(logPath, fmt.Sprintf("%v.%v.err", nowStr, count))
-
-		outFile, err := os.Create(stdoutFile)
-		fileHandle = append(fileHandle, outFile)
-		if err != nil {
-			fn(&Error{IOError, err})
-			return
-		}
-
-		errFile, err := os.Create(stderrFile)
-		fileHandle = append(fileHandle, errFile)
-		if err != nil {
-			fn(&Error{IOError, err})
-			return
-		}
-
-		cmdAndArgs := strings.Fields(cmd)
-		_exec := exec.Command(cmdAndArgs[0], cmdAndArgs[1:]...)
-		_exec.Dir = currentDir
-		_exec.Stdout = outFile
-		_exec.Stderr = errFile
-
-		// exec command
-		if err := _exec.Start(); err != nil {
-			fn(&Error{CmdExecutionError, err})
-			return
-		}
-
-		// wait until done
-		if err := _exec.Wait(); err != nil {
-			fn(&Error{CmdExecutionError, err})
-			return
-		}
-	}
+	return stdOutChan, stdErrChan, errChan
 }

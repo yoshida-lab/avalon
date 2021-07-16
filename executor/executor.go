@@ -19,6 +19,6 @@ package executor
 type Operation interface {
 	SyncFileRemote(srcDest map[string]string, currentDir string, fromLocal bool, opts *CopyOptions) (err error)
 	SyncFileLocal(srcDest map[string]string, currentDir string, opts *CopyOptions) (err error)
-	ExecRemote(commands *[]string, stepForward func([]string, error))
-	ExecLocal(currentDir string, commands *[]string, stepForward func(error))
+	ExecRemote(currentDir string, commands *[]string) (stdOut <-chan string, stdErr <-chan string, err <-chan error)
+	ExecLocal(currentDir string, commands *[]string) (stdOut <-chan string, stdErr <-chan string, err <-chan error)
 }

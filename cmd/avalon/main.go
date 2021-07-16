@@ -103,7 +103,7 @@ func main() {
 	v1 := router.Group("/v1")
 	api.RegisterRoute(v1)
 
-	// Run http server
+	// run http server
 	apiServer := &http.Server{
 		Addr:         ":8052",
 		Handler:      router,

@@ -20,54 +20,9 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
-
-func TestLocalExecutor_ExecLocal(t *testing.T) {
-	type args struct {
-		currentDir string
-		commands   *[]string
-		fn         func(error)
-	}
-	tests := []struct {
-		name string
-		args args
-		want string
-	}{
-		{
-			"make log dir error",
-			args{
-				"/not_exist_dir",
-				&[]string{"ls", "-l"},
-				func(err error) {
-					if err != nil {
-						panic(err)
-					}
-				},
-			},
-			"IOError (0): mkdir /not_exist_dir: read-only file system",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			defer func() {
-				if r := recover(); r == nil {
-					t.Errorf("The code did not panic")
-				} else {
-					if e, ok := r.(*Error); ok {
-						if e.String() != tt.want {
-							t.Errorf("panic with unexpected information: %v", r)
-						}
-					} else {
-						t.Errorf("expecte type '*executor.Error' got: %T", e)
-					}
-				}
-			}()
-			l := NewLocalExecutor()
-			l.ExecLocal(tt.args.currentDir, tt.args.commands, tt.args.fn)
-		})
-	}
-}
 
 func Test_copyOrMove(t *testing.T) {
 	type args struct {
@@ -155,7 +110,7 @@ func Test_copyOrMove(t *testing.T) {
 					t.Errorf("copyOrMove() error = %v, wantErr %v", err, tt.wantErr)
 				}
 				if info.Mode() != tt.args.perm {
-					t.Errorf("copyOrMove() error = %v, want %v, got %v", "wrong permission", tt.args.perm, info.Mode())
+					t.Errorf("copyOrMove() error = %v, outChan %v, got %v", "wrong permission", tt.args.perm, info.Mode())
 				}
 
 				// check if move
@@ -388,6 +343,69 @@ func Test_syncOne(t *testing.T) {
 				}
 			}
 
+		})
+	}
+}
+
+func Test_localExecutor_ExecLocal(t *testing.T) {
+	type args struct {
+		currentDir string
+		commands   *[]string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		outChan string
+		errChan string
+		err     error
+	}{
+		{
+			name: "should be ok",
+			args: args{
+				currentDir: ".",
+				commands:   &[]string{"echo error"},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			l := &localExecutor{}
+			gotOutChan, gotErrChan, gotErr := l.ExecLocal(tt.args.currentDir, tt.args.commands)
+			var (
+				outStrBuild strings.Builder
+				errStrBuild strings.Builder
+				err         error
+			)
+
+		loop:
+			for {
+				select {
+				case outline := <-gotOutChan:
+					if outline != "" {
+						outStrBuild.WriteString(outline)
+						outStrBuild.WriteString("\n")
+					}
+				case outline := <-gotErrChan:
+					if outline != "" {
+						errStrBuild.WriteString(outline)
+						errStrBuild.WriteString("\n")
+					}
+				case err = <-gotErr:
+					break loop
+				}
+			}
+			outStr := outStrBuild.String()
+			errStr := errStrBuild.String()
+
+			if outStr != tt.outChan {
+				t.Errorf("ExecLocal() gotOutChan = %v, except \"%v\"", outStr, tt.outChan)
+			}
+			if errStr != tt.errChan {
+				t.Errorf("ExecLocal() gotErrChan = %v, except \"%v\"", errStr, tt.errChan)
+			}
+			if err != tt.err {
+				t.Errorf("ExecLocal() gotErr = %v, except \"%v\"", err, tt.err)
+			}
 		})
 	}
 }

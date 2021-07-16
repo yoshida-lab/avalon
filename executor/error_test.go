@@ -119,7 +119,7 @@ func TestError_String(t *testing.T) {
 				err:     tt.fields.Err,
 			}
 			if got := e.String(); got != tt.want {
-				t.Errorf("String() = %v, want %v", got, tt.want)
+				t.Errorf("String() = %v, outChan %v", got, tt.want)
 			}
 		})
 	}
